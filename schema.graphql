@@ -1,10 +1,16 @@
 type Query {
-  allCharacters: [Character!]!
-  character(id: ID!): Character
-  allPlanets: [Planet!]!
-  planet(id: ID!): Planet
-  allStarships: [Starship!]!
-  starship(id: ID!): Starship
+    allCharacters: [Character!]!
+    character(id: ID!): Character
+    allPlanets: [Planet!]!
+    planet(id: ID!): Planet
+    allStarships: [Starship!]!
+    starship(id: ID!): Starship
+
+    # New queries
+    allSpecies: [Species!]!
+    species(id: ID!): Species
+    allFactions: [Faction!]!
+    faction(id: ID!): Faction
 }
 
 type Mutation {
@@ -36,8 +42,9 @@ input UpdatePlanetInput {
 
 input CreateCharacterInput {
   name: String!
-  species: String
+  speciesId: Int
   homePlanetId: Int
+  factionId: Int
 }
 
 input AssignStarshipInput {
@@ -49,7 +56,9 @@ input AssignStarshipInput {
 input UpdateCharacterInput {
     id: ID!,
     name: String,
-    species: String,
+    speciesId: Int,
+    homePlanetId: Int,
+    factionId: Int
 }
 
 input updateStarshipInput {
@@ -61,8 +70,9 @@ input updateStarshipInput {
 type Character {
   id: ID!
   name: String!
-  species: String
+  species: Species
   homePlanet: Planet
+  faction: Faction
   pilotedStarships: [Starship!]!
 }
 
@@ -72,6 +82,20 @@ type Planet {
   climate: String
   terrain: String
   residents: [Character!]!
+}
+
+type Species {
+    id: ID!
+    name: String!
+    average_lifespan: Int
+    classification: String
+    language: String
+}
+
+type Faction {
+    id: ID!
+    name: String!
+    ideology: String
 }
 
 type Starship {

@@ -10,6 +10,8 @@ def seed_data():
     c.execute("DELETE FROM characters")
     c.execute("DELETE FROM starships")
     c.execute("DELETE FROM planets")
+    c.execute("DELETE FROM species")
+    c.execute("DELETE FROM factions")
     conn.commit()
 
     # Data planet
@@ -23,15 +25,37 @@ def seed_data():
     c.executemany("INSERT INTO planets (name, climate, terrain) VALUES (?, ?, ?)", planets)
     planet_ids = {row["name"]: row["id"] for row in c.execute("SELECT id, name FROM planets").fetchall()}
 
+    # Data species
+    species = [
+        ("Human", 80, "Mammal", "Galactic Basic"),
+        ("Droid", None, "Artificial", "Binary"),
+        ("Wookiee", 400, "Mammal", "Shyriiwook"),
+        ("Rodian", 20, "Reptilian", "Rodese"),
+        ("Twi'lek", 70, "Mammal", "Twi'leki"),
+    ]
+    c.executemany("INSERT INTO species (name, average_lifespan, classification, language) VALUES (?, ?, ?, ?)", species)
+    species_ids = {row["name"]: row["id"] for row in c.execute("SELECT id, name FROM species").fetchall()}
+
+    # Data factions
+    factions = [
+        ("Galactic Empire", "Authoritarian"),
+        ("Rebel Alliance", "Democratic"),
+        ("Jedi Order", "Peacekeeping"),
+        ("Sith Order", "Authoritarian"),
+        ("Bounty Hunters Guild", "Mercenary"),
+    ]
+    c.executemany("INSERT INTO factions (name, ideology) VALUES (?, ?)", factions)
+    factions_ids = {row["name"]: row["id"] for row in c.execute("SELECT id, name FROM factions").fetchall()}
+
     # Data karakter
     characters = [
-        ("Luke Skywalker", "Human", planet_ids["Tatooine"]),
-        ("Leia Organa", "Human", planet_ids["Alderaan"]),
-        ("Han Solo", "Human", None),
-        ("C-3PO", "Droid", None),
-        ("Yoda", "Unknown", None),
+        ("Luke Skywalker", species_ids["Human"], planet_ids["Tatooine"], factions_ids["Jedi Order"]),
+        ("Leia Organa", species_ids["Droid"], planet_ids["Alderaan"], factions_ids["Rebel Alliance"]),
+        ("Han Solo", species_ids["Human"], None, factions_ids["Rebel Alliance"]),
+        ("C-3PO", species_ids["Droid"], None, factions_ids["Galactic Empire"]),
+        ("Yoda", None, None, factions_ids["Jedi Order"]),
     ]
-    c.executemany("INSERT INTO characters (name, species, home_planet_id) VALUES (?, ?, ?)", characters)
+    c.executemany("INSERT INTO characters (name, species_id, home_planet_id, faction_id) VALUES (?, ?, ?, ?)", characters)
     character_ids = {row["name"]: row["id"] for row in c.execute("SELECT id, name FROM characters").fetchall()}
 
     # Data kapal

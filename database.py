@@ -23,14 +23,37 @@ def init_db():
         )
     """)
 
+    # Tabel species
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS species (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL,
+            average_lifespan INTEGER,
+            classification TEXT,
+            language TEXT
+        )
+    """)
+
+    # Tabel factions
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS factions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL,
+            ideology TEXT
+        )
+    """)
+
     # Tabel characters
     c.execute("""
         CREATE TABLE IF NOT EXISTS characters (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT UNIQUE NOT NULL,
-            species TEXT,
+            species_id TEXT,
             home_planet_id INTEGER,
+            faction_id INTEGER,
             FOREIGN KEY (home_planet_id) REFERENCES planets (id)
+            FOREIGN KEY (species_id) REFERENCES species (id)
+            FOREIGN KEY (faction_id) REFERENCES factions (id)
         )
     """)
 

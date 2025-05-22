@@ -1,3 +1,4 @@
+import sqlite3
 from ariadne import QueryType, MutationType, ObjectType
 from database import get_db_connection
 
@@ -12,7 +13,7 @@ starship_type = ObjectType("Starship")
 def resolve_all_characters(_, info):
     conn = get_db_connection()
     try:
-        characters = conn.execute("SELECT id, name, species, home_planet_id FROM characters").fetchall()
+        characters = conn.execute("SELECT id, name, species_id, home_planet_id, faction_id FROM characters").fetchall()
         return [dict(char) for char in characters]
     finally:
         conn.close()
@@ -23,6 +24,24 @@ def resolve_character(_, info, id):
     try:
         character = conn.execute("SELECT id, name, species, home_planet_id FROM characters WHERE id = ?", (id,)).fetchone()
         return dict(character) if character else None
+    finally:
+        conn.close()
+
+@query.field("allSpecies")
+def resolve_all_species(_, info):
+    conn = get_db_connection()
+    try:
+        species = conn.execute("SELECT id, name, average_lifespan, classification, language FROM species").fetchall()
+        return [dict(char) for char in species]
+    finally:
+        conn.close()
+
+@query.field("species")
+def resolve_species(_, info, id):
+    conn = get_db_connection()
+    try:
+        species = conn.execute("SELECT id, name, average_lifespan, classification, language FROM species WHERE id = ?", (id,)).fetchone()
+        return dict(species) if species else None
     finally:
         conn.close()
 
@@ -59,6 +78,24 @@ def resolve_starship(_, info, id):
     try:
         starship = conn.execute("SELECT id, name, model, manufacturer FROM starships WHERE id = ?", (id,)).fetchone()
         return dict(starship) if starship else None
+    finally:
+        conn.close()
+
+@query.field("allFactions")
+def resolve_all_factions(_, info):
+    conn = get_db_connection()
+    try:
+        factions = conn.execute("SELECT id, name, ideology FROM factions").fetchall()
+        return [dict(f) for f in factions]
+    finally:
+        conn.close()
+
+@query.field("faction")
+def resolve_faction(_, info, id):
+    conn = get_db_connection()
+    try:
+        faction = conn.execute("SELECT id, name, ideology FROM factions WHERE id = ?", (id,)).fetchone()
+        return dict(faction) if faction else None
     finally:
         conn.close()
 
@@ -121,6 +158,36 @@ def resolve_starship_pilots(starship_obj, info):
             (starship_id,),
         ).fetchall()
         return [dict(char) for char in characters]
+    finally:
+        conn.close()
+
+@character_type.field("species")
+def resolve_character_species(character_obj, info):
+    species_id = character_obj.get("species_id")
+    if not species_id:
+        return None
+    conn = get_db_connection()
+    try:
+        species = conn.execute(
+            "SELECT id, name, average_lifespan, classification, language FROM species WHERE id = ?", 
+            (species_id,)
+        ).fetchone()
+        return dict(species) if species else None
+    finally:
+        conn.close()
+
+@character_type.field("faction")
+def resolve_character_faction(character_obj, info):
+    faction_id = character_obj.get("faction_id")
+    if not faction_id:
+        return None
+    conn = get_db_connection()
+    try:
+        faction = conn.execute(
+            "SELECT id, name, ideology FROM factions WHERE id = ?", 
+            (faction_id,)
+        ).fetchone()
+        return dict(faction) if faction else None
     finally:
         conn.close()
 
@@ -190,16 +257,22 @@ def resolve_create_character(_, info, input):
     try:
         if input.get("homePlanetId"):
             planet = conn.execute("SELECT id FROM planets WHERE id = ?", (input["homePlanetId"],)).fetchone()
+            species = conn.execute("SELECT id FROM species WHERE id = ?", (input["speciesId"],)).fetchone()
+            faction = conn.execute("SELECT id FROM factions WHERE id = ?", (input["factionId"],)).fetchone()
             if not planet:
                 raise Exception(f"Planet dengan ID {input['homePlanetId']} tidak ditemukan.")
+            elif not species:
+                raise Exception(f"Species dengan ID {input['speciesId']} tidak ditemukan.")
+            elif not faction:   
+                raise Exception(f"Faction dengan ID {input['factionId']} tidak ditemukan.")
         conn.execute(
-            "INSERT INTO characters (name, species, home_planet_id) VALUES (?, ?, ?)",
-            (input["name"], input.get("species"), input.get("homePlanetId")),
+            "INSERT INTO characters (name, species_id, home_planet_id, faction_id) VALUES (?, ?, ?)",
+            (input["name"], input.get("speciesId"), input.get("homePlanetId"), input.get("factionId")),
         )
         conn.commit()
         char_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
         character = conn.execute(
-            "SELECT id, name, species, home_planet_id FROM characters WHERE id = ?", (char_id,)
+            "SELECT id, name, species_id, home_planet_id, faction_id FROM characters WHERE id = ?", (char_id,)
         ).fetchone()
         return dict(character)
     except sqlite3.IntegrityError:
@@ -235,19 +308,21 @@ def resolve_assign_starship(_, info, input):
 def resolve_update_character(_, info, input):
     conn = get_db_connection()
     try:
-        character = conn.execute("SELECT id, name, species FROM characters WHERE id = ?", (input["id"],)).fetchone()
+        character = conn.execute("SELECT id, name, species_id, home_planet_id, faction_id  FROM characters WHERE id = ?", (input["id"],)).fetchone()
         if not character:
             raise Exception(f"Character dengan ID {input['id']} tidak ditemukan.")
         conn.execute(
-            "UPDATE characters SET name = ?, species = ? WHERE id = ?",
+            "UPDATE characters SET name = ?, species_id = ?, home_planet_id = ?, faction_id = ? WHERE id = ?",
             (
                 input.get("name", character["name"]),
-                input.get("species", character["species"]),
+                input.get("speciesId", character["species_id"]),
+                input.get("homePlanetId", character["home_planet_id"]),
+                input.get("factionId", character["faction_id"]),
                 input["id"],
             ),
         )
         conn.commit()
-        updated_character = conn.execute("SELECT id, name, species FROM characters WHERE id = ?", (input["id"],)).fetchone()
+        updated_character = conn.execute("SELECT id, name, species_id, home_planet_id, faction_id FROM characters WHERE id = ?", (input["id"],)).fetchone()
         return dict(updated_character)
     except sqlite3.IntegrityError:
         conn.rollback()
@@ -263,6 +338,44 @@ def resolve_delete_character(_, info, id):
         if not character:
             raise Exception(f"Character dengan ID {id} tidak ditemukan.")
         conn.execute("DELETE FROM characters WHERE id = ?", (id,))
+        conn.commit()
+        return True
+    finally:
+        conn.close()
+
+@mutation.field("updateStarship")
+def resolve_update_starship(_, info, input):
+    conn = get_db_connection()
+    try:
+        starship = conn.execute("SELECT id, name, model, manufacturer FROM starships WHERE id = ?", (input["id"],)).fetchone()
+        if not starship:
+            raise Exception(f"Starship dengan ID {input['id']} tidak ditemukan.")
+        conn.execute(
+            "UPDATE starships SET name = ?, model = ?, manufacturer = ? WHERE id = ?",
+            (
+                input.get("name", starship["name"]),
+                input.get("species", starship["model"]),
+                input.get("species", starship["manufacturer"]),
+                input["id"],
+            ),
+        )
+        conn.commit()
+        updated_starship = conn.execute("SELECT id, name, model, manufacturer FROM starships WHERE id = ?", (input["id"],)).fetchone()
+        return dict(updated_starship)
+    except sqlite3.IntegrityError:
+        conn.rollback()
+        raise Exception("Nama Starship sudah digunakan.")
+    finally:
+        conn.close()
+
+@mutation.field("deleteStarship")
+def resolve_delete_starship(_, info, id):
+    conn = get_db_connection()
+    try:
+        starship = conn.execute("SELECT id FROM starships WHERE id = ?", (id,)).fetchone()
+        if not starship:
+            raise Exception(f"Starship dengan ID {id} tidak ditemukan.")
+        conn.execute("DELETE FROM starships WHERE id = ?", (id,))
         conn.commit()
         return True
     finally:
